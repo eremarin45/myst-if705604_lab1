@@ -9,7 +9,6 @@
 # -- repository: YOUR REPOSITORY URL                                                                     -- #
 # -- --------------------------------------------------------------------------------------------------- -- #
 """
-
 import pandas as pd
 from datetime import datetime
 from os import path, listdir
@@ -60,17 +59,17 @@ for i in archivos:
     # Guardar en diccionario
     data_archivos[i] = data
 
-#--- Construir vector de fechas a partir del vector de nombres de archivos------- Paso 1.3
+# --- Construir vector de fechas a partir del vector de nombres de archivos------- Paso 1.3
 # Estas serviran como etiqueta en data frame y yahoo finance
 t_fechas = [i.strftime('%d-%m-%Y') for i in sorted([pd.to_datetime(i[8:]).date() for i in archivos])]
 
 # Lista con fechas ordenadas (para usar como indexador de archivos)
 i_fechas = [j.strftime('%d-%m-%Y') for j in sorted([pd.to_datetime(i[8:]).date() for i in archivos])]
 
-#-------- Construir el vector de tickers que vamos a utilizar en yfinance --- Paso 1.4
+# -------- Construir el vector de tickers que vamos a utilizar en yfinance --- Paso 1.4
 tickers = []
 for i in archivos:
-    #i = archivos[1] checar si funciona
+    # i = archivos[1] checar si funciona
     l_tickers = list(data_archivos[i]['Ticker'])
     [tickers.append(i + '.MX') for i in l_tickers]
 
@@ -78,7 +77,7 @@ global_tickers = np.unique(tickers).tolist()
 # eliminar MXN, USD, y tickers con problemas de precios: KOFL, BSMXB
 [global_tickers.remove(i) for i in ['MXN.MX', 'USD.MX', 'KOFL.MX', 'BSMXB.MX']]
 
-#-------- Descargar y acomodar todos los precios historicos --- Paso 1.5
+# -------- Descargar y acomodar todos los precios historicos --- Paso 1.5
 # cambios en nombres de tickers
 global_tickers = [i.replace('GFREGIO.MX', 'RA.MX') for i in global_tickers]
 global_tickers = [i.replace('MEXCHEM.MX', 'ORBIA.MX') for i in global_tickers]
@@ -91,19 +90,31 @@ inicio = time.time()
 data = yf.download(global_tickers, start="2017-08-21", end="2020-08-21", actions=False,
                    group_by="close", interval='1d', auto_adjust=True, prepost=False, threads=True)
 
-# tiempo que se tarda
+# time
 print('se tardo', round(time.time() - inicio, 2), 'segundos')
-"""""
-# ------- Obtener posiciones historicas ---------------------------- Paso 1.6
 
+# ------- Obtener posiciones historicas ---------------------------- Paso 1.6
 # nota, pasar en todos los meses las posiciones en KOFL.MXN y BSMXB.MX a CASH en MXN
+close = pd.DataFrame({i: data[i]["Close"] for i in global_tickers})
 
 # tomar solo fechas de interes
-# tomar solo col de nteres
+fechas = [j.strftime("%Y-%m-%d") for j in sorted(pd.to_datetime(i[8:]).date() for i in archivos)]
+# Se cambia el tipo de fecha para que se ajuste al mismo formato y veamos si se encuentran todas
+ic_fechas = sorted(list(set(close.index.astype(str).tolist()) & set(fechas)))
+# Localizar todos los precios
+precios = np.concatenate([np.where(close.index == ic_fechas[i]) for i in range(len(ic_fechas))])\
+    .reshape(len(ic_fechas),)
+# Elegir Posiciones históricas
+closes_timeframe = close.iloc[precios, :]
+
+# Ordenar columnas en orden lexográfico
+precios = closes_timeframe.reindex(sorted(closes_timeframe.columns), axis=1)
+
+
 # transponer matriz para tener x: fechas y: precios
 # multiplicar matriz de precios por matriz de pesos
-#hacer suma de cada col para obtener valor marcado
-
+# hacer suma de cada col para obtener valor marcado
+"""""
 # Posicion inicial
 k = 1000000 # capital inicial
 c = 0.00125 # comisiones por transaccion
@@ -163,4 +174,3 @@ pos_datos['Capital'] = pos_datos['Peso (%)'] * k - pos_datos['Peso (%)'] * k * c
 # Cantidad de titulos por acción
 pos_datos['Titulos'] = pos_datos['Capital'] // pos_datos['Precio']
 """
-
